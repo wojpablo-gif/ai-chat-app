@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chat App</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .chat-container {
+            width: 90%;
+            max-width: 800px;
+            height: 80vh;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-header {
+            background: #4f46e5;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .chat-header h1 {
+            margin-bottom: 5px;
+        }
+
+        .chat-stats {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #f8fafc;
+        }
+
+        .message {
+            margin-bottom: 20px;
+            max-width: 80%;
+        }
+
+        .message.user {
+            margin-left: auto;
+        }
+
+        .message.assistant {
+            margin-right: auto;
+        }
+
+        .message-content {
+            padding: 15px;
+            border-radius: 15px;
+            word-wrap: break-word;
+        }
+
+        .message.user .message-content {
+            background: #4f46e5;
+            color: white;
+        }
+
+        .message.assistant .message-content {
+            background: white;
+            border: 1px solid #e2e8f0;
+        }
+
+        .message-meta {
+            font-size: 12px;
+            margin-top: 5px;
+            opacity: 0.7;
+        }
+
+        .chat-input {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        #messageInput {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 16px;
+            outline: none;
+        }
+
+        #messageInput:focus {
+            border-color: #4f46e5;
+        }
+
+        #sendButton {
+            padding: 15px 25px;
+            background: #4f46e5;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.2s;
+        }
+
+        #sendButton:hover {
+            background: #3730a3;
+        }
+
+        #sendButton:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: #6b7280;
+        }
+
+        .stats-box {
+            margin-top: 10px;
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+        }
+
+        .stat {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .stat-value {
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h1>AI Chat App</h1>
+            <div class="chat-stats">Powered by Google Gemini</div>
+            <div class="stats-box">
+                <div class="stat">
+                    <div class="stat-value" id="totalTokens">0</div>
+                    <div class="stat-label">Total Tokens</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="totalCost">$0.000</div>
+                    <div class="stat-label">Total Cost</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="chat-messages" id="chatMessages">
+            <div class="message assistant">
+                <div class="message-content">
+                    👋 Hello! I'm your AI assistant powered by Google Gemini. Ask me anything!
+                </div>
+                <div class="message-meta">Cost: $0.000 | Tokens: 0</div>
+            </div>
+        </div>
+
+        <div class="loading" id="loading">
+            <div>🤖 Thinking...</div>
+        </div>
+
+        <div class="chat-input">
+            <div class="input-group">
+                <input 
+                    type="text" 
+                    id="messageInput" 
+                    placeholder="Type your message here..."
+                    maxlength="1000"
+                >
+                <button id="sendButton">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let totalTokens = 0;
+        let totalCost = 0;
+
+        const chatMessages = document.getElementById('chatMessages');
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        const loading = document.getElementById('loading');
+        const totalTokensEl = document.getElementById('totalTokens');
+        const totalCostEl = document.getElementById('totalCost');
+
+        function addMessage(content, isUser = false, tokens = 0, cost = 0) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user' : 'assistant'}`;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.textContent = content;
+            
+            const metaDiv = document.createElement('div');
+            metaDiv.className = 'message-meta';
+            metaDiv.textContent = `Cost: $${cost.toFixed(6)} | Tokens: ${tokens}`;
+            
+            messageDiv.appendChild(contentDiv);
+            messageDiv.appendChild(metaDiv);
+            chatMessages.appendChild(messageDiv);
+            
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            
+            // Update totals
+            totalTokens += tokens;
+            totalCost += cost;
+            totalTokensEl.textContent = totalTokens.toLocaleString();
+            totalCostEl.textContent = `$${totalCost.toFixed(6)}`;
+        }
+
+        async function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message) return;
+
+            // Add user message
+            addMessage(message, true);
+            messageInput.value = '';
+            
+            // Show loading
+            sendButton.disabled = true;
+            loading.style.display = 'block';
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        model: 'gemini-1.5-flash'
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    addMessage(data.response, false, data.tokens_used, data.cost);
+                } else {
+                    addMessage(`Error: ${data.detail}`, false, 0, 0);
+                }
+            } catch (error) {
+                addMessage(`Error: ${error.message}`, false, 0, 0);
+            } finally {
+                sendButton.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+
+        sendButton.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>
